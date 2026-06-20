@@ -1,0 +1,6 @@
+venv/
+.env
+__pycache__/
+input_images/
+processed_images/
+dukaan_bot.zip
