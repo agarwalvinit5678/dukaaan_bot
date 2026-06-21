@@ -103,7 +103,7 @@ async def handle_photo(update: Update, context: ContextTypes.DEFAULT_TYPE) -> in
     from image_processor import composite_lifestyle_image
     
     image_paths = [processed_path]
-    has_lifestyle = composite_lifestyle_image(processed_path, lifestyle_path, title)
+    has_lifestyle = composite_lifestyle_image(processed_path, lifestyle_path, title, user_notes)
     
     if has_lifestyle:
         await update.message.reply_photo(photo=open(lifestyle_path, 'rb'), caption="Here is the Nano Banana lifestyle version!")

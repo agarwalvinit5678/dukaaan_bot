@@ -81,7 +81,7 @@ def generate_product_details(image_path: str, user_notes: str = None) -> dict:
             pass
         return {"title": "Generated Product", "description": "Please update the description manually. AI generation failed."}
 
-def generate_lifestyle_background(product_title: str, image_path: str = None) -> bytes:
+def generate_lifestyle_background(product_title: str, image_path: str = None, user_notes: str = "") -> bytes:
     """Uses Gemini 3.1 Flash Image (Nano Banana) to generate a lifestyle background, directly editing the original image if provided."""
     try:
         from google import genai
@@ -102,13 +102,25 @@ def generate_lifestyle_background(product_title: str, image_path: str = None) ->
                 mime_type = "image/jpeg"
             parts.append(types.Part.from_bytes(data=img_data, mime_type=mime_type))
             
-            prompt = f"Take this product ({product_title}), remove its original background, and place it seamlessly into a beautiful, modern, highly realistic lifestyle scene. For example, a sleek modern wooden desk next to a bright window with a small coffee plant. Make sure the lighting and shadows match perfectly."
+            prompt = f"Take this product ({product_title}), remove its original background, and place it seamlessly into a beautiful, highly realistic lifestyle scene. "
+            if user_notes:
+                prompt += f"\nTHE USER REQUESTED THIS SPECIFIC SETTING/PROMPT: '{user_notes}'. Please strictly follow their request for the background setting. "
+            else:
+                prompt += "\nPlace it in a clean, professional, well-lit studio environment with soft complementary colors, depth of field, and elegant subtle shadows that make the product pop. "
+                
+            prompt += "\n\nCRITICAL INSTRUCTION: Do NOT alter, redraw, or modify the product itself in any way. Preserve the product's original shape, text, branding, proportions, and details exactly as shown in the reference image. Only generate the surrounding background."
+            
             parts.append(types.Part.from_text(text=prompt))
-            print("Using Nano Banana to EDIT the image natively...")
+            print(f"Using Nano Banana to EDIT the image natively. Custom notes: {user_notes}")
         else:
-            prompt = f"Generate a beautiful, modern, highly realistic lifestyle background scene that would fit a product called '{product_title}'. For example: 'A sleek modern wooden desk next to a bright window with a small coffee plant'."
+            prompt = f"Generate a beautiful, highly realistic lifestyle background scene that would fit a product called '{product_title}'. "
+            if user_notes:
+                prompt += f"\nTHE USER REQUESTED THIS SPECIFIC SETTING: '{user_notes}'. "
+            else:
+                prompt += "Use a clean, professional, well-lit studio environment with soft complementary colors and elegant subtle shadows. "
+                
             parts.append(types.Part.from_text(text=prompt))
-            print("Using Nano Banana to GENERATE a lifestyle image from scratch...")
+            print(f"Using Nano Banana to GENERATE a lifestyle image from scratch. Custom notes: {user_notes}")
 
         contents = [
             types.Content(

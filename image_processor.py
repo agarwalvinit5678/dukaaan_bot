@@ -36,11 +36,11 @@ def process_product_image(input_path: str, output_path: str):
         print(f"Error processing image: {e}")
         return False
 
-def composite_lifestyle_image(transparent_image_path: str, output_path: str, product_title: str) -> bool:
+def composite_lifestyle_image(transparent_image_path: str, output_path: str, product_title: str, user_notes: str = "") -> bool:
     """Generates an AI background and saves it directly, bypassing compositing since rembg OOMs."""
     try:
         from ai_assistant import generate_lifestyle_background
-        bg_bytes = generate_lifestyle_background(product_title, transparent_image_path)
+        bg_bytes = generate_lifestyle_background(product_title, transparent_image_path, user_notes)
         if not bg_bytes:
             print("Failed to generate background bytes.")
             return False
