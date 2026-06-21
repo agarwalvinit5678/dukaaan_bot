@@ -2,19 +2,38 @@ import os
 os.environ["OMP_NUM_THREADS"] = "1"
 os.environ["MKL_NUM_THREADS"] = "1"
 os.environ["OPENBLAS_NUM_THREADS"] = "1"
+os.environ["ORT_ENABLE_ARENA"] = "0"  # Prevent ONNX from allocating huge memory pools
 from io import BytesIO
 from PIL import Image, ImageEnhance
 from rembg import remove, new_session
+
+# Global cached session so we don't load the ONNX model into memory twice
+_rembg_session = None
+
+def get_session():
+    global _rembg_session
+    if _rembg_session is None:
+        _rembg_session = new_session("u2netp", providers=['CPUExecutionProvider'])
+    return _rembg_session
 
 def remove_background(input_path: str, output_path: str):
     """
     Removes the background from the image at input_path and saves it to output_path.
     """
-    with open(input_path, 'rb') as i:
-        input_data = i.read()
+    # 1. Extreme memory saving: Resize image BEFORE passing to rembg!
+    # The U2Net model internally resizes to 320x320 anyway, but passing a large image
+    # causes massive NumPy arrays to be allocated during pre/post processing.
+    img = Image.open(input_path)
+    img.thumbnail((400, 400), Image.Resampling.LANCZOS)
     
-    # Use the 'u2netp' lightweight model instead of default 'u2net' to stay under 512MB RAM
-    session = new_session("u2netp")
+    temp_io = BytesIO()
+    # Save as PNG to the buffer to pass to rembg
+    img.save(temp_io, format="PNG")
+    input_data = temp_io.getvalue()
+    
+    # 2. Use the globally cached lightweight model session
+    session = get_session()
+    
     # rembg requires image bytes and returns image bytes
     output_data = remove(input_data, session=session)
     
