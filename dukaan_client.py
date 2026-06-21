@@ -48,12 +48,12 @@ def create_dukaan_product(details: dict, image_urls: list) -> dict:
         "Content-Type": "application/json"
     }
     
-    title = details.get("title", "New Product")
-    desc = details.get("description", "")
-    price = details.get("base_price", 0)
-    orig_price = details.get("original_price", price)
-    sku = details.get("sku", "")
-    inv = details.get("stock_quantity", 10)
+    title = details.get("title") or "New Product"
+    desc = details.get("description") or ""
+    price = details.get("base_price") or 0
+    orig_price = details.get("original_price") or price
+    sku = details.get("sku") or ""
+    inv = details.get("stock_quantity") or 10
     
     primary_url = image_urls[0] if image_urls else ""
     
