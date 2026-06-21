@@ -112,12 +112,21 @@ async def handle_photo(update: Update, context: ContextTypes.DEFAULT_TYPE) -> in
     # Check if AI found a valid base price
     if base_price is not None and isinstance(base_price, (int, float)) and base_price > 0:
         message = (
-            f"**Generated Draft:**\n\n"
+            f"**Generated Full Product Draft:**\n\n"
             f"**Title:** {title}\n"
-            f"**Price:** ₹{base_price}\n"
-            f"*(Extracted from your notes!)*\n\n"
-            f"**Description:** {description}\n\n"
-            f"Uploading directly to Dukaan..."
+            f"**Category:** {details.get('google_product_category', 'Home Decor')}\n"
+            f"**Selling Price:** ₹{base_price} (MRP: ₹{details.get('original_price', base_price)})\n"
+            f"**SKU:** {details.get('sku', 'N/A')}\n"
+            f"**Inventory:** {details.get('stock_quantity', 10)}\n"
+            f"**Weight:** {details.get('weight', 500)}g\n"
+            f"**HSN Code:** {details.get('hsn_code', 'N/A')}\n"
+            f"**GST Rate:** {details.get('gst_rate', 0)}%\n"
+            f"**GTIN:** {details.get('gtin', 'N/A')}\n"
+            f"**Tags:** {', '.join(details.get('tags', []))}\n\n"
+            f"**SEO Title:** {details.get('seo_title', title)}\n"
+            f"**SEO Desc:** {details.get('seo_description', description[:50])}\n\n"
+            f"**Description Snippet:** {description[:100]}...\n\n"
+            f"Uploading directly to Dukaan with all details..."
         )
         await update.message.reply_text(message, parse_mode='Markdown')
         
@@ -135,9 +144,17 @@ async def handle_photo(update: Update, context: ContextTypes.DEFAULT_TYPE) -> in
         context.user_data['image_paths'] = image_paths
         
         message = (
-            f"**Generated Draft:**\n\n"
+            f"**Generated Full Product Draft:**\n\n"
             f"**Title:** {title}\n"
-            f"**Description:** {description}\n\n"
+            f"**Category:** {details.get('google_product_category', 'Home Decor')}\n"
+            f"**SKU:** {details.get('sku', 'N/A')}\n"
+            f"**Inventory:** {details.get('stock_quantity', 10)}\n"
+            f"**Weight:** {details.get('weight', 500)}g\n"
+            f"**HSN Code:** {details.get('hsn_code', 'N/A')}\n"
+            f"**GST Rate:** {details.get('gst_rate', 0)}%\n"
+            f"**GTIN:** {details.get('gtin', 'N/A')}\n"
+            f"**Tags:** {', '.join(details.get('tags', []))}\n\n"
+            f"**Description Snippet:** {description[:100]}...\n\n"
             f"💰 Please reply with the **Price** in rupees (just the number) to list this on Dukaan, or type 'cancel' to abort."
         )
         

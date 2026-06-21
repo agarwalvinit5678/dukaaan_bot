@@ -27,16 +27,23 @@ def generate_product_details(image_path: str, user_notes: str = None) -> dict:
             prompt += f"\nTHE SELLER ALSO PROVIDED THESE NOTES: \"{user_notes}\". Incorporate these notes heavily into your generation, especially extracting any price, material, or specific details mentioned!\n"
             
         prompt += """
-        Generate the following details:
+        Generate the following details based on the image:
         1. "title": A catchy, SEO-friendly Title (max 60 characters).
-        2. "description": A compelling Description detailing features, potential uses, and appeal.
-        3. "base_price": An integer representing the selling price. If the seller provided a price in the notes, use it! If you cannot determine a price, return null.
-        4. "original_price": An integer representing the MRP. If base_price is set, make this about 20% to 30% higher to show a discount. If no base_price, return null.
-        5. "sku": A random, logical string (e.g., MAT-BLU-01) based on the item.
-        6. "stock_quantity": An integer for inventory (default to 10 if not in notes).
-        7. "weight": An integer for weight in grams (estimate, default 500).
+        2. "description": A highly detailed, comprehensive, and professional product description formatted in HTML. It should cover everything: an engaging introduction, a bulleted list of key features and specifications, materials used, potential use cases, and why the customer should buy it. Use HTML tags like <p>, <ul>, <li>, <strong>, etc. Make it long and thorough.
+        3. "base_price": An integer representing the selling price (discounted price). If the seller provided a price, use it! If not, estimate it in INR.
+        4. "original_price": An integer representing the MRP. Usually 20% to 30% higher than base_price.
+        5. "sku": A random, logical string (e.g., FRM-BLK-CLG-09).
+        6. "stock_quantity": An integer for inventory (default 10).
+        7. "weight": An integer for weight in grams (estimate).
+        8. "hsn_code": A relevant 4 to 8 digit HSN code string for the product (e.g., "9403" for furniture, "4202" for bags).
+        9. "gst_rate": An integer for GST percentage (e.g., 5, 12, 18, 28).
+        10. "tags": A list of relevant string tags (e.g., ["home decor", "wooden", "wall art"]).
+        11. "gtin": A random 12-14 digit GTIN/UPC string (or null if not applicable).
+        12. "google_product_category": A relevant string from Google's product taxonomy (e.g., "Home & Garden > Decor").
+        13. "seo_title": An SEO-optimized Title Tag (max 60 chars).
+        14. "seo_description": An SEO-optimized Meta Description Tag (max 160 chars).
 
-        Format your response EXACTLY as a JSON object with these exact keys: "title", "description", "base_price", "original_price", "sku", "stock_quantity", "weight".
+        Format your response EXACTLY as a JSON object with these exact keys: "title", "description", "base_price", "original_price", "sku", "stock_quantity", "weight", "hsn_code", "gst_rate", "tags", "gtin", "google_product_category", "seo_title", "seo_description".
         Do not include any markdown formatting like ```json. Just raw JSON.
         """
         

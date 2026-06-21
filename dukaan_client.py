@@ -82,19 +82,21 @@ def create_dukaan_product(details: dict, image_urls: list) -> dict:
                 "staffs": [],
                 "metafields": [],
                 "warehouse_inventory_items": [],
-                "in_stock": True
+                "in_stock": True,
+                "gtin": details.get("gtin"),
+                "google_product_category": details.get("google_product_category")
             }
         ],
-        "hsn_code": None,
-        "gst_rate": 0,
+        "hsn_code": details.get("hsn_code"),
+        "gst_rate": details.get("gst_rate") or 0,
         "weight_unit": "kg",
         "product_attributes": [],
         "staffs": [],
         "language_data": [],
-        "is_taxable": False,
+        "is_taxable": bool(details.get("gst_rate")),
         "seo_data": {
-            "title": title[:60],
-            "description": desc[:160],
+            "title": details.get("seo_title") or title[:60],
+            "description": details.get("seo_description") or desc[:160],
             "image": primary_url
         },
         "inventory_quantity": inv,
