@@ -1,7 +1,7 @@
 import os
 from io import BytesIO
 from PIL import Image, ImageEnhance
-from rembg import remove
+from rembg import remove, new_session
 
 def remove_background(input_path: str, output_path: str):
     """
@@ -10,8 +10,10 @@ def remove_background(input_path: str, output_path: str):
     with open(input_path, 'rb') as i:
         input_data = i.read()
     
+    # Use the 'u2netp' lightweight model instead of default 'u2net' to stay under 512MB RAM
+    session = new_session("u2netp")
     # rembg requires image bytes and returns image bytes
-    output_data = remove(input_data)
+    output_data = remove(input_data, session=session)
     
     with open(output_path, 'wb') as o:
         o.write(output_data)
