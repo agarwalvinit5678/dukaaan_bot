@@ -7,6 +7,21 @@ from flask import Flask
 import threading
 import os
 
+# Setup dummy Flask server for Render
+app = Flask(__name__)
+
+@app.route('/')
+def home():
+    return "Bot is awake and running!"
+
+def run_flask():
+    port = int(os.environ.get("PORT", 10000))
+    app.run(host='0.0.0.0', port=port)
+
+flask_thread = threading.Thread(target=run_flask)
+flask_thread.daemon = True
+flask_thread.start()
+
 # Import our custom modules
 from image_processor import process_product_image
 from ai_assistant import generate_product_details
@@ -25,16 +40,6 @@ logger = logging.getLogger(__name__)
 # Define states for the conversation
 WAITING_FOR_PRICE = 1
 
-# Setup dummy Flask server for Render
-app = Flask(__name__)
-
-@app.route('/')
-def home():
-    return "Bot is awake and running!"
-
-def run_flask():
-    port = int(os.environ.get("PORT", 10000))
-    app.run(host='0.0.0.0', port=port)
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     """Send a message when the command /start is issued."""
@@ -178,9 +183,7 @@ def main() -> None:
     application.add_handler(CommandHandler("start", start))
     application.add_handler(conv_handler)
 
-    flask_thread = threading.Thread(target=run_flask)
-    flask_thread.daemon = True
-    flask_thread.start()
+
 
     print("Bot is running...")
     application.run_polling(allowed_updates=Update.ALL_TYPES)
