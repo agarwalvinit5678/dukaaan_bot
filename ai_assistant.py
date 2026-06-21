@@ -35,15 +35,13 @@ def generate_product_details(image_path: str, user_notes: str = None) -> dict:
         5. "sku": A random, logical string (e.g., FRM-BLK-CLG-09).
         6. "stock_quantity": An integer for inventory (default 10).
         7. "weight": An integer for weight in grams (estimate).
-        8. "hsn_code": A relevant 4 to 8 digit HSN code string for the product (e.g., "9403" for furniture, "4202" for bags).
-        9. "gst_rate": An integer for GST percentage (e.g., 5, 12, 18, 28).
-        10. "tags": A list of relevant string tags (e.g., ["home decor", "wooden", "wall art"]).
-        11. "gtin": A random 12-14 digit GTIN/UPC string (or null if not applicable).
-        12. "google_product_category": A relevant string from Google's product taxonomy (e.g., "Home & Garden > Decor").
-        13. "seo_title": An SEO-optimized Title Tag (max 60 chars).
-        14. "seo_description": An SEO-optimized Meta Description Tag (max 160 chars).
+        8. "tags": A list of relevant string tags (e.g., ["home decor", "wooden", "wall art"]).
+        9. "gtin": A random 12-14 digit GTIN/UPC string (or null if not applicable).
+        10. "google_product_category": A relevant string from Google's product taxonomy (e.g., "Home & Garden > Decor").
+        11. "seo_title": An SEO-optimized Title Tag (max 60 chars).
+        12. "seo_description": An SEO-optimized Meta Description Tag (max 160 chars).
 
-        Format your response EXACTLY as a JSON object with these exact keys: "title", "description", "base_price", "original_price", "sku", "stock_quantity", "weight", "hsn_code", "gst_rate", "tags", "gtin", "google_product_category", "seo_title", "seo_description".
+        Format your response EXACTLY as a JSON object with these exact keys: "title", "description", "base_price", "original_price", "sku", "stock_quantity", "weight", "tags", "gtin", "google_product_category", "seo_title", "seo_description".
         Do not include any markdown formatting like ```json. Just raw JSON.
         """
         
@@ -87,6 +85,52 @@ def generate_product_details(image_path: str, user_notes: str = None) -> dict:
         except:
             pass
         return {"title": "Generated Product", "description": "Please update the description manually. AI generation failed."}
+
+def refine_product_details(current_details: dict, feedback: str) -> dict:
+    """Uses Gemini REST API to update an existing product draft based on user feedback."""
+    api_key = os.getenv("GEMINI_API_KEY")
+    if not api_key:
+        return current_details
+        
+    try:
+        prompt = f"""
+        You are an expert e-commerce product manager.
+        Here is the current JSON draft for a product:
+        {json.dumps(current_details)}
+        
+        The user wants to make the following corrections/feedback:
+        "{feedback}"
+        
+        Please apply these corrections to the JSON.
+        Format your response EXACTLY as a JSON object with the exact same keys.
+        Do not include any markdown formatting like ```json. Just raw JSON.
+        """
+        
+        payload = {
+            "contents": [{"parts": [{"text": prompt}]}]
+        }
+        
+        url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-flash-latest:generateContent?key={api_key}"
+        headers = {'Content-Type': 'application/json'}
+        
+        response = requests.post(url, headers=headers, json=payload)
+        response.raise_for_status()
+        
+        response_data = response.json()
+        result_text = response_data['candidates'][0]['content']['parts'][0]['text'].strip()
+        
+        if result_text.startswith("```json"):
+            result_text = result_text[7:]
+        if result_text.startswith("```"):
+            result_text = result_text[3:]
+        if result_text.endswith("```"):
+            result_text = result_text[:-3]
+            
+        return json.loads(result_text.strip())
+        
+    except Exception as e:
+        print(f"Error refining details: {e}")
+        return current_details
 
 def generate_lifestyle_background(product_title: str, image_path: str = None, user_notes: str = "") -> bytes:
     """Uses Gemini 3.1 Flash Image (Nano Banana) to generate a lifestyle background, directly editing the original image if provided."""

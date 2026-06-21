@@ -87,13 +87,13 @@ def create_dukaan_product(details: dict, image_urls: list) -> dict:
                 "google_product_category": details.get("google_product_category")
             }
         ],
-        "hsn_code": details.get("hsn_code"),
-        "gst_rate": details.get("gst_rate") or 0,
+        "hsn_code": None,
+        "gst_rate": 0,
         "weight_unit": "kg",
         "product_attributes": [],
         "staffs": [],
         "language_data": [],
-        "is_taxable": bool(details.get("gst_rate")),
+        "is_taxable": False,
         "seo_data": {
             "title": details.get("seo_title") or title[:60],
             "description": details.get("seo_description") or desc[:160],

@@ -44,8 +44,28 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 # Define states for the conversation
-WAITING_FOR_PRICE = 1
+WAITING_FOR_APPROVAL = 1
 
+def format_preview_message(details: dict, description: str) -> str:
+    title = details.get("title", "Unknown")
+    base_price = details.get("base_price", "N/A")
+    orig_price = details.get("original_price", base_price)
+    
+    return (
+        f"**Generated Full Product Draft:**\n\n"
+        f"**Title:** {title}\n"
+        f"**Category:** {details.get('google_product_category', 'Home Decor')}\n"
+        f"**Selling Price:** ₹{base_price} (MRP: ₹{orig_price})\n"
+        f"**SKU:** {details.get('sku', 'N/A')}\n"
+        f"**Inventory:** {details.get('stock_quantity', 10)}\n"
+        f"**Weight:** {details.get('weight', 500)}g\n"
+        f"**GTIN:** {details.get('gtin', 'N/A')}\n"
+        f"**Tags:** {', '.join(details.get('tags', []))}\n\n"
+        f"**SEO Title:** {details.get('seo_title', title)}\n"
+        f"**SEO Desc:** {details.get('seo_description', description[:50])}\n\n"
+        f"**Description Snippet:** {description[:100]}...\n\n"
+        f"👉 Reply with **'approve'** to upload to Dukaan, OR reply with any corrections (e.g., 'change price to 500', 'remove red from title'), OR type **'cancel'**."
+    )
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     """Send a message when the command /start is issued."""
@@ -94,8 +114,6 @@ async def handle_photo(update: Update, context: ContextTypes.DEFAULT_TYPE) -> in
     details = generate_product_details(processed_path, user_notes=user_notes)
     
     title = details.get("title", "Unknown")
-    description = details.get("description", "No description")
-    base_price = details.get("base_price")
     
     # 3.5 Generate Lifestyle Image
     await update.message.reply_text("🎨 Asking Nano Banana to generate a beautiful lifestyle background...")
@@ -109,60 +127,18 @@ async def handle_photo(update: Update, context: ContextTypes.DEFAULT_TYPE) -> in
         await update.message.reply_photo(photo=open(lifestyle_path, 'rb'), caption="Here is the Nano Banana lifestyle version!")
         image_paths.insert(0, lifestyle_path) # Put lifestyle image first (primary)
     
-    # Check if AI found a valid base price
-    if base_price is not None and isinstance(base_price, (int, float)) and base_price > 0:
-        message = (
-            f"**Generated Full Product Draft:**\n\n"
-            f"**Title:** {title}\n"
-            f"**Category:** {details.get('google_product_category', 'Home Decor')}\n"
-            f"**Selling Price:** ₹{base_price} (MRP: ₹{details.get('original_price', base_price)})\n"
-            f"**SKU:** {details.get('sku', 'N/A')}\n"
-            f"**Inventory:** {details.get('stock_quantity', 10)}\n"
-            f"**Weight:** {details.get('weight', 500)}g\n"
-            f"**HSN Code:** {details.get('hsn_code', 'N/A')}\n"
-            f"**GST Rate:** {details.get('gst_rate', 0)}%\n"
-            f"**GTIN:** {details.get('gtin', 'N/A')}\n"
-            f"**Tags:** {', '.join(details.get('tags', []))}\n\n"
-            f"**SEO Title:** {details.get('seo_title', title)}\n"
-            f"**SEO Desc:** {details.get('seo_description', description[:50])}\n\n"
-            f"**Description Snippet:** {description[:100]}...\n\n"
-            f"Uploading directly to Dukaan with all details..."
-        )
-        await update.message.reply_text(message, parse_mode='Markdown')
-        
-        try:
-            process_and_list_product(image_paths, details)
-            await update.message.reply_text("🎉 **Successfully listed on your Dukaan store!**", parse_mode='Markdown')
-        except Exception as e:
-            await update.message.reply_text(f"⚠️ Failed to list the product on Dukaan. Error: {e}")
-            
-        return ConversationHandler.END
-        
-    else:
-        # Save details and ask for price manually
-        context.user_data['draft_details'] = details
-        context.user_data['image_paths'] = image_paths
-        
-        message = (
-            f"**Generated Full Product Draft:**\n\n"
-            f"**Title:** {title}\n"
-            f"**Category:** {details.get('google_product_category', 'Home Decor')}\n"
-            f"**SKU:** {details.get('sku', 'N/A')}\n"
-            f"**Inventory:** {details.get('stock_quantity', 10)}\n"
-            f"**Weight:** {details.get('weight', 500)}g\n"
-            f"**HSN Code:** {details.get('hsn_code', 'N/A')}\n"
-            f"**GST Rate:** {details.get('gst_rate', 0)}%\n"
-            f"**GTIN:** {details.get('gtin', 'N/A')}\n"
-            f"**Tags:** {', '.join(details.get('tags', []))}\n\n"
-            f"**Description Snippet:** {description[:100]}...\n\n"
-            f"💰 Please reply with the **Price** in rupees (just the number) to list this on Dukaan, or type 'cancel' to abort."
-        )
-        
-        await update.message.reply_text(message, parse_mode='Markdown')
-        return WAITING_FOR_PRICE
+    # Show Preview
+    context.user_data['draft_details'] = details
+    context.user_data['image_paths'] = image_paths
+    
+    description = details.get("description", "No description")
+    message = format_preview_message(details, description)
+    await update.message.reply_text(message, parse_mode='Markdown')
+    
+    return WAITING_FOR_APPROVAL
 
-async def handle_price(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
-    """Handles manual price input and creates the listing."""
+async def handle_approval(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    """Handles user approval or refinement of the draft."""
     text = update.message.text.strip()
     
     if text.lower() == 'cancel':
@@ -170,28 +146,31 @@ async def handle_price(update: Update, context: ContextTypes.DEFAULT_TYPE) -> in
         context.user_data.clear()
         return ConversationHandler.END
         
-    try:
-        price = float(text)
-    except ValueError:
-        await update.message.reply_text("Please enter a valid number for the price, or 'cancel'.")
-        return WAITING_FOR_PRICE
-        
-    await update.message.reply_text(f"✅ Price set to ₹{price}. Uploading to Dukaan...")
-    
     details = context.user_data.get('draft_details', {})
     image_paths = context.user_data.get('image_paths')
-    
-    # Inject the manual price into the rich details payload
-    details['base_price'] = price
-    
-    try:
-        process_and_list_product(image_paths, details)
-        await update.message.reply_text("🎉 **Successfully listed on your Dukaan store!**", parse_mode='Markdown')
-    except Exception as e:
-        await update.message.reply_text(f"⚠️ Failed to list the product on Dukaan. Error: {e}")
         
-    context.user_data.clear()
-    return ConversationHandler.END
+    if text.lower() == 'approve':
+        await update.message.reply_text("🚀 Approving! Uploading to Dukaan now...")
+        try:
+            process_and_list_product(image_paths, details)
+            await update.message.reply_text("🎉 **Successfully listed on your Dukaan store!**", parse_mode='Markdown')
+        except Exception as e:
+            await update.message.reply_text(f"⚠️ Failed to list the product on Dukaan. Error: {e}")
+        context.user_data.clear()
+        return ConversationHandler.END
+        
+    # Otherwise, treat it as feedback and refine
+    await update.message.reply_text("✍️ Understood! Asking AI to refine the draft based on your instructions...")
+    from ai_assistant import refine_product_details
+    refined_details = refine_product_details(details, text)
+    
+    context.user_data['draft_details'] = refined_details
+    description = refined_details.get("description", "No description")
+    
+    message = format_preview_message(refined_details, description)
+    await update.message.reply_text(message, parse_mode='Markdown')
+    
+    return WAITING_FOR_APPROVAL
 
 async def cancel(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     """Cancels and ends the conversation."""
@@ -210,15 +189,13 @@ def main() -> None:
     conv_handler = ConversationHandler(
         entry_points=[MessageHandler(filters.PHOTO, handle_photo)],
         states={
-            WAITING_FOR_PRICE: [MessageHandler(filters.TEXT & ~filters.COMMAND, handle_price)],
+            WAITING_FOR_APPROVAL: [MessageHandler(filters.TEXT & ~filters.COMMAND, handle_approval)],
         },
         fallbacks=[CommandHandler("cancel", cancel)],
     )
 
     application.add_handler(CommandHandler("start", start))
     application.add_handler(conv_handler)
-
-
 
     print("Bot is running...")
     application.run_polling(allowed_updates=Update.ALL_TYPES)
