@@ -81,47 +81,63 @@ def generate_product_details(image_path: str, user_notes: str = None) -> dict:
             pass
         return {"title": "Generated Product", "description": "Please update the description manually. AI generation failed."}
 
-def generate_lifestyle_background(product_title: str) -> bytes:
-    """Uses Gemini Imagen 4.0 to generate a lifestyle background based on the product title."""
-    api_key = os.getenv("GEMINI_API_KEY")
-    
-    # 1. Ask Gemini Text to generate a great prompt
-    text_url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-flash-latest:generateContent?key={api_key}"
-    text_payload = {
-        "contents": [{
-            "parts": [{"text": f"Write a single sentence (max 20 words) describing a beautiful, modern, highly realistic lifestyle background scene that would fit a product called '{product_title}'. For example: 'A sleek modern wooden desk next to a bright window with a small coffee plant'. Do not mention the product itself, just the empty background scene."}]
-        }]
-    }
-    
-    prompt = "A beautiful modern wooden coffee table in a sunlit living room, depth of field, 4k"
+def generate_lifestyle_background(product_title: str, image_path: str = None) -> bytes:
+    """Uses Gemini 3.1 Flash Image (Nano Banana) to generate a lifestyle background, directly editing the original image if provided."""
     try:
-        r = requests.post(text_url, json=text_payload, headers={'Content-Type': 'application/json'})
-        if r.status_code == 200:
-            prompt = r.json()['candidates'][0]['content']['parts'][0]['text'].strip()
-    except Exception as e:
-        print(f"Failed to generate dynamic prompt, falling back: {e}")
+        from google import genai
+        from google.genai import types
+        import mimetypes
         
-    print(f"Imagen Prompt: {prompt}")
-    
-    # 2. Call Imagen 4.0 API
-    imagen_url = f"https://generativelanguage.googleapis.com/v1beta/models/imagen-4.0-fast-generate-001:predict?key={api_key}"
-    imagen_payload = {
-        "instances": [{"prompt": prompt}],
-        "parameters": {"sampleCount": 1}
-    }
-    
-    try:
-        r = requests.post(imagen_url, json=imagen_payload, headers={'Content-Type': 'application/json'})
-        r.raise_for_status()
-        data = r.json()
+        client = genai.Client(api_key=os.getenv("GEMINI_API_KEY"))
+        model = "gemini-3.1-flash-image"
         
-        # The API returns predictions[0]['bytesBase64Encoded']
-        b64_image = data['predictions'][0]['bytesBase64Encoded']
-        return base64.b64decode(b64_image)
+        # Build the parts
+        parts = []
+        
+        if image_path and os.path.exists(image_path):
+            with open(image_path, "rb") as f:
+                img_data = f.read()
+            mime_type, _ = mimetypes.guess_type(image_path)
+            if not mime_type:
+                mime_type = "image/jpeg"
+            parts.append(types.Part.from_bytes(data=img_data, mime_type=mime_type))
+            
+            prompt = f"Take this product ({product_title}), remove its original background, and place it seamlessly into a beautiful, modern, highly realistic lifestyle scene. For example, a sleek modern wooden desk next to a bright window with a small coffee plant. Make sure the lighting and shadows match perfectly."
+            parts.append(types.Part.from_text(text=prompt))
+            print("Using Nano Banana to EDIT the image natively...")
+        else:
+            prompt = f"Generate a beautiful, modern, highly realistic lifestyle background scene that would fit a product called '{product_title}'. For example: 'A sleek modern wooden desk next to a bright window with a small coffee plant'."
+            parts.append(types.Part.from_text(text=prompt))
+            print("Using Nano Banana to GENERATE a lifestyle image from scratch...")
+
+        contents = [
+            types.Content(
+                role="user",
+                parts=parts,
+            ),
+        ]
+        
+        generate_content_config = types.GenerateContentConfig(
+            response_modalities=["IMAGE"],
+        )
+
+        response = client.models.generate_content(
+            model=model,
+            contents=contents,
+            config=generate_content_config,
+        )
+        
+        if not response.candidates:
+            print("No candidates returned from Nano Banana.")
+            return None
+            
+        for part in response.candidates[0].content.parts:
+            if part.inline_data and part.inline_data.data:
+                return part.inline_data.data
+                
+        print("No inline image data found in Nano Banana response.")
+        return None
+        
     except Exception as e:
-        print(f"Error generating lifestyle background: {e}")
-        try:
-            print(r.text)
-        except:
-            pass
+        print(f"Error generating lifestyle background with Nano Banana: {e}")
         return None

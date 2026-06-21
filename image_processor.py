@@ -40,7 +40,7 @@ def composite_lifestyle_image(transparent_image_path: str, output_path: str, pro
     """Generates an AI background and saves it directly, bypassing compositing since rembg OOMs."""
     try:
         from ai_assistant import generate_lifestyle_background
-        bg_bytes = generate_lifestyle_background(product_title)
+        bg_bytes = generate_lifestyle_background(product_title, transparent_image_path)
         if not bg_bytes:
             print("Failed to generate background bytes.")
             return False
