@@ -35,46 +35,77 @@ def upload_to_imgbb(image_path: str) -> str:
 
 def create_dukaan_product(details: dict, image_url: str) -> dict:
     """
-    Creates a product listing on the Dukaan store with rich fields.
+    Creates a product listing on the Dukaan store with rich fields using the v2 endpoint.
     """
     if not DUKAAN_API_TOKEN or not DUKAAN_STORE_UUID:
         raise ValueError("Dukaan credentials are not set.")
 
-    url = f"https://mydukaan.io/api/v1/stores/{DUKAAN_STORE_UUID}/products"
+    url = f"https://api.mydukaan.io/api/product/seller/{DUKAAN_STORE_UUID}/product/v2/"
     
     headers = {
         "Authorization": f"Bearer {DUKAAN_API_TOKEN}",
         "Content-Type": "application/json"
     }
     
+    title = details.get("title", "New Product")
+    desc = details.get("description", "")
+    price = details.get("base_price", 0)
+    orig_price = details.get("original_price", price)
+    sku = details.get("sku", "")
+    inv = details.get("stock_quantity", 10)
+    
+    # Exact payload structure expected by Dukaan API v2
     payload = {
-        "name": details.get("title", "New Product"),
-        "description": details.get("description", ""),
-        "price": details.get("base_price", 0),
-        "is_hidden": False,
-        "images": [
+        "name": title,
+        "all_images": [image_url],
+        "selling_price": price,
+        "original_price": orig_price,
+        "unit": "piece",
+        "base_qty": 1,
+        "description": f"<p>{desc}</p>",
+        "categories": [13000145],  # Required Category ID
+        "store": DUKAAN_STORE_UUID,
+        "sku_code": sku,
+        "skus": [
             {
-                "url": image_url
+                "sku_code": sku,
+                "unit": "piece",
+                "inventory": inv,
+                "selling_price": price,
+                "original_price": orig_price,
+                "primary_image": image_url,
+                "all_images": [image_url],
+                "attributes": [],
+                "staffs": [],
+                "metafields": [],
+                "warehouse_inventory_items": [],
+                "in_stock": True
             }
-        ]
+        ],
+        "hsn_code": None,
+        "gst_rate": 0,
+        "weight_unit": "kg",
+        "product_attributes": [],
+        "staffs": [],
+        "language_data": [],
+        "is_taxable": False,
+        "seo_data": {
+            "title": title[:60],
+            "description": desc[:160],
+            "image": image_url
+        },
+        "inventory_quantity": inv,
+        "in_stock": True,
+        "add_ons": []
     }
     
-    # Add optional rich fields if they were generated
-    if details.get("original_price"):
-        payload["original_price"] = details["original_price"]
-        
-    if details.get("sku"):
-        payload["sku"] = details["sku"]
-        
-    if details.get("stock_quantity") is not None:
-        payload["inventory"] = details["stock_quantity"]
-        
     if details.get("weight") is not None:
-        payload["weight"] = details["weight"]
+        payload["weight"] = details["weight"] / 1000.0  # Convert grams to kg
+        payload["skus"][0]["volumetric_weight"] = payload["weight"]
     
     response = requests.post(url, headers=headers, json=payload)
     
-    if response.status_code in [200, 201]:
+    if response.status_code in [200, 201, 202]:
         return response.json()
     else:
         raise Exception(f"Failed to create product on Dukaan: {response.status_code} - {response.text}")
