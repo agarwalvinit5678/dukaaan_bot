@@ -41,12 +41,14 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     user = update.effective_user
     await update.message.reply_html(
         rf"Hi {user.mention_html()}! I am your Dukaan Store Assistant. 🛍️\n"
-        "Send me a product picture, and I'll automatically enhance it, generate a description, and list it for you!"
+        "Send me a product picture, optionally with notes in the caption (like price or materials), and I'll automatically generate a listing for you!"
     )
     return ConversationHandler.END
 
 async def handle_photo(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
-    """Handles incoming photos."""
+    """Handles incoming photos and captions."""
+    user_notes = update.message.caption or ""
+    
     await update.message.reply_text("📸 Received your photo! Let me process it...")
     
     # 1. Download the photo
@@ -72,36 +74,59 @@ async def handle_photo(update: Update, context: ContextTypes.DEFAULT_TYPE) -> in
     # Send the enhanced image back to the user to show the result
     await update.message.reply_photo(photo=open(processed_path, 'rb'), caption="Here is the enhanced version!")
 
-    # 3. Generate Details
-    await update.message.reply_text("🧠 Analyzing the image to write a catchy title and description...")
-    details = generate_product_details(processed_path)
+    # 3. Generate Details using Image and Notes
+    msg = "🧠 Analyzing the image"
+    if user_notes:
+        msg += " and your notes"
+    await update.message.reply_text(msg + " to write a comprehensive listing...")
+    
+    details = generate_product_details(processed_path, user_notes=user_notes)
     
     title = details.get("title", "Unknown")
     description = details.get("description", "No description")
+    base_price = details.get("base_price")
     
-    # Store these in the context so we can use them after getting the price
-    context.user_data['draft_title'] = title
-    context.user_data['draft_description'] = description
-    context.user_data['processed_path'] = processed_path
-    
-    message = (
-        f"**Generated Draft:**\n\n"
-        f"**Title:** {title}\n"
-        f"**Description:** {description}\n\n"
-        f"💰 Please reply with the **Price** in rupees (just the number) to list this on Dukaan, or type 'cancel' to abort."
-    )
-    
-    await update.message.reply_text(message, parse_mode='Markdown')
-    
-    return WAITING_FOR_PRICE
+    # Check if AI found a valid base price
+    if base_price is not None and isinstance(base_price, (int, float)) and base_price > 0:
+        message = (
+            f"**Generated Draft:**\n\n"
+            f"**Title:** {title}\n"
+            f"**Price:** ₹{base_price}\n"
+            f"*(Extracted from your notes!)*\n\n"
+            f"**Description:** {description}\n\n"
+            f"Uploading directly to Dukaan..."
+        )
+        await update.message.reply_text(message, parse_mode='Markdown')
+        
+        try:
+            process_and_list_product(processed_path, details)
+            await update.message.reply_text("🎉 **Successfully listed on your Dukaan store!**", parse_mode='Markdown')
+        except Exception as e:
+            await update.message.reply_text(f"⚠️ Failed to list the product on Dukaan. Error: {e}")
+            
+        return ConversationHandler.END
+        
+    else:
+        # Save details and ask for price manually
+        context.user_data['draft_details'] = details
+        context.user_data['processed_path'] = processed_path
+        
+        message = (
+            f"**Generated Draft:**\n\n"
+            f"**Title:** {title}\n"
+            f"**Description:** {description}\n\n"
+            f"💰 Please reply with the **Price** in rupees (just the number) to list this on Dukaan, or type 'cancel' to abort."
+        )
+        
+        await update.message.reply_text(message, parse_mode='Markdown')
+        return WAITING_FOR_PRICE
 
 async def handle_price(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
-    """Handles the price input and creates the listing."""
+    """Handles manual price input and creates the listing."""
     text = update.message.text.strip()
     
     if text.lower() == 'cancel':
         await update.message.reply_text("❌ Listing cancelled. Send me another photo when you're ready!")
-        # Clean up data
         context.user_data.clear()
         return ConversationHandler.END
         
@@ -113,19 +138,19 @@ async def handle_price(update: Update, context: ContextTypes.DEFAULT_TYPE) -> in
         
     await update.message.reply_text(f"✅ Price set to ₹{price}. Uploading to Dukaan...")
     
-    title = context.user_data.get('draft_title')
-    description = context.user_data.get('draft_description')
+    details = context.user_data.get('draft_details', {})
     processed_path = context.user_data.get('processed_path')
     
+    # Inject the manual price into the rich details payload
+    details['base_price'] = price
+    
     try:
-        process_and_list_product(processed_path, title, description, price)
+        process_and_list_product(processed_path, details)
         await update.message.reply_text("🎉 **Successfully listed on your Dukaan store!**", parse_mode='Markdown')
     except Exception as e:
         await update.message.reply_text(f"⚠️ Failed to list the product on Dukaan. Error: {e}")
         
-    # Clean up data
     context.user_data.clear()
-    
     return ConversationHandler.END
 
 async def cancel(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
@@ -140,10 +165,8 @@ def main() -> None:
         print("Error: TELEGRAM_BOT_TOKEN is not set. Please check your .env file.")
         return
 
-    # Create the Application and pass it your bot's token.
     application = Application.builder().token(TELEGRAM_BOT_TOKEN).build()
 
-    # Set up the conversation handler
     conv_handler = ConversationHandler(
         entry_points=[MessageHandler(filters.PHOTO, handle_photo)],
         states={
@@ -155,12 +178,10 @@ def main() -> None:
     application.add_handler(CommandHandler("start", start))
     application.add_handler(conv_handler)
 
-    # Start Flask server in a separate thread
     flask_thread = threading.Thread(target=run_flask)
     flask_thread.daemon = True
     flask_thread.start()
 
-    # Run the bot until the user presses Ctrl-C
     print("Bot is running...")
     application.run_polling(allowed_updates=Update.ALL_TYPES)
 

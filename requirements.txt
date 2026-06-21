@@ -1,7 +1,7 @@
 python-telegram-bot
 rembg
 Pillow
-google-generativeai
+google-genai
 requests
 python-dotenv
 Flask

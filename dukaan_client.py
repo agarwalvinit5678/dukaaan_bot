@@ -33,17 +33,13 @@ def upload_to_imgbb(image_path: str) -> str:
     else:
         raise Exception(f"Failed to upload to ImgBB: {response.text}")
 
-def create_dukaan_product(title: str, description: str, price: float, image_url: str) -> dict:
+def create_dukaan_product(details: dict, image_url: str) -> dict:
     """
-    Creates a product listing on the Dukaan store.
+    Creates a product listing on the Dukaan store with rich fields.
     """
     if not DUKAAN_API_TOKEN or not DUKAAN_STORE_UUID:
         raise ValueError("Dukaan credentials are not set.")
 
-    # Dukaan's API endpoint structure usually looks like this.
-    # Note: Depending on the exact API version, this endpoint might vary slightly.
-    # Typically, it's https://mydukaan.io/api/v1/stores/{store_uuid}/products
-    # We will use the standard v1 structure as a starting point.
     url = f"https://mydukaan.io/api/v1/stores/{DUKAAN_STORE_UUID}/products"
     
     headers = {
@@ -52,17 +48,29 @@ def create_dukaan_product(title: str, description: str, price: float, image_url:
     }
     
     payload = {
-        "name": title,
-        "description": description,
-        "price": price,
-        # 'media' or 'images' array depending on the exact Dukaan spec
+        "name": details.get("title", "New Product"),
+        "description": details.get("description", ""),
+        "price": details.get("base_price", 0),
+        "is_hidden": False,
         "images": [
             {
                 "url": image_url
             }
-        ],
-        "is_hidden": False,
+        ]
     }
+    
+    # Add optional rich fields if they were generated
+    if details.get("original_price"):
+        payload["original_price"] = details["original_price"]
+        
+    if details.get("sku"):
+        payload["sku"] = details["sku"]
+        
+    if details.get("stock_quantity") is not None:
+        payload["inventory"] = details["stock_quantity"]
+        
+    if details.get("weight") is not None:
+        payload["weight"] = details["weight"]
     
     response = requests.post(url, headers=headers, json=payload)
     
@@ -71,15 +79,15 @@ def create_dukaan_product(title: str, description: str, price: float, image_url:
     else:
         raise Exception(f"Failed to create product on Dukaan: {response.status_code} - {response.text}")
 
-def process_and_list_product(image_path: str, title: str, description: str, price: float):
+def process_and_list_product(image_path: str, details: dict):
     """
-    High-level function to upload image and list product.
+    High-level function to upload image and list product with rich details.
     """
     print("Uploading image to ImgBB...")
     public_url = upload_to_imgbb(image_path)
     print(f"Image uploaded successfully: {public_url}")
     
     print("Creating product on Dukaan...")
-    result = create_dukaan_product(title, description, price, public_url)
+    result = create_dukaan_product(details, public_url)
     print("Product created successfully!")
     return result
