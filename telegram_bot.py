@@ -103,7 +103,7 @@ async def handle_photo(update: Update, context: ContextTypes.DEFAULT_TYPE) -> in
         return ConversationHandler.END
         
     # Send the enhanced image back to the user to show the result
-    await update.message.reply_photo(photo=open(processed_path, 'rb'), caption="Here is the enhanced version!")
+    await update.message.reply_photo(photo=open(processed_path, 'rb'), caption="Here is the enhanced version!", read_timeout=60, write_timeout=60)
 
     # 3. Generate Details using Image and Notes
     msg = "🧠 Analyzing the image"
@@ -124,7 +124,7 @@ async def handle_photo(update: Update, context: ContextTypes.DEFAULT_TYPE) -> in
     has_lifestyle = composite_lifestyle_image(processed_path, lifestyle_path, title, user_notes)
     
     if has_lifestyle:
-        await update.message.reply_photo(photo=open(lifestyle_path, 'rb'), caption="Here is the Nano Banana lifestyle version!")
+        await update.message.reply_photo(photo=open(lifestyle_path, 'rb'), caption="Here is the Nano Banana lifestyle version!", read_timeout=60, write_timeout=60)
         image_paths.insert(0, lifestyle_path) # Put lifestyle image first (primary)
     
     # Show Preview
