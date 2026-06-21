@@ -57,7 +57,7 @@ async def handle_photo(update: Update, context: ContextTypes.DEFAULT_TYPE) -> in
     os.makedirs("processed_images", exist_ok=True)
     
     input_path = f"input_images/{photo_file.file_id}.jpg"
-    processed_path = f"processed_images/{photo_file.file_id}.jpg"
+    processed_path = f"processed_images/{photo_file.file_id}.png"
     
     await photo_file.download_to_drive(input_path)
     
