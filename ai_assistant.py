@@ -29,7 +29,7 @@ def generate_product_details(image_path: str, user_notes: str = None) -> dict:
         prompt += """
         Generate the following details based on the image:
         1. "title": A catchy, SEO-friendly Title (max 60 characters).
-        2. "description": A highly detailed, comprehensive, and professional product description formatted in HTML. It should cover everything: an engaging introduction, a bulleted list of key features and specifications, materials used, potential use cases, and why the customer should buy it. Use HTML tags like <p>, <ul>, <li>, <strong>, etc. Make it long and thorough.
+        2. "description": A highly detailed, comprehensive, and professional product description formatted in HTML. It should cover everything: an engaging introduction, a bulleted list of key features and specifications, materials used, potential use cases, and why the customer should buy it. Use HTML tags like <p>, <ul>, <li>, <strong>, etc. Make it long and thorough. DO NOT include any pricing, GST, tax, or shipping information in the description.
         3. "base_price": An integer representing the selling price (discounted price). If the seller provided a price, use it! If not, estimate it in INR.
         4. "original_price": An integer representing the MRP. Usually 20% to 30% higher than base_price.
         5. "sku": A random, logical string (e.g., FRM-BLK-CLG-09).
