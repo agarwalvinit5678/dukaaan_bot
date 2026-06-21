@@ -1,4 +1,10 @@
 import os
+
+# STRICT MEMORY LIMITS for ONNX/rembg on Render 512MB free tier
+os.environ["OMP_NUM_THREADS"] = "1"
+os.environ["MKL_NUM_THREADS"] = "1"
+os.environ["OPENBLAS_NUM_THREADS"] = "1"
+
 import logging
 from telegram import Update, ReplyKeyboardMarkup, ReplyKeyboardRemove
 from telegram.ext import Application, CommandHandler, MessageHandler, filters, ContextTypes, ConversationHandler
@@ -91,6 +97,18 @@ async def handle_photo(update: Update, context: ContextTypes.DEFAULT_TYPE) -> in
     description = details.get("description", "No description")
     base_price = details.get("base_price")
     
+    # 3.5 Generate Lifestyle Image
+    await update.message.reply_text("🎨 Asking Nano Banana to generate a beautiful lifestyle background...")
+    lifestyle_path = f"processed_images/{photo_file.file_id}_lifestyle.jpg"
+    from image_processor import composite_lifestyle_image
+    
+    image_paths = [processed_path]
+    has_lifestyle = composite_lifestyle_image(processed_path, lifestyle_path, title)
+    
+    if has_lifestyle:
+        await update.message.reply_photo(photo=open(lifestyle_path, 'rb'), caption="Here is the Nano Banana lifestyle version!")
+        image_paths.insert(0, lifestyle_path) # Put lifestyle image first (primary)
+    
     # Check if AI found a valid base price
     if base_price is not None and isinstance(base_price, (int, float)) and base_price > 0:
         message = (
@@ -104,7 +122,7 @@ async def handle_photo(update: Update, context: ContextTypes.DEFAULT_TYPE) -> in
         await update.message.reply_text(message, parse_mode='Markdown')
         
         try:
-            process_and_list_product(processed_path, details)
+            process_and_list_product(image_paths, details)
             await update.message.reply_text("🎉 **Successfully listed on your Dukaan store!**", parse_mode='Markdown')
         except Exception as e:
             await update.message.reply_text(f"⚠️ Failed to list the product on Dukaan. Error: {e}")
@@ -114,7 +132,7 @@ async def handle_photo(update: Update, context: ContextTypes.DEFAULT_TYPE) -> in
     else:
         # Save details and ask for price manually
         context.user_data['draft_details'] = details
-        context.user_data['processed_path'] = processed_path
+        context.user_data['image_paths'] = image_paths
         
         message = (
             f"**Generated Draft:**\n\n"
@@ -144,13 +162,13 @@ async def handle_price(update: Update, context: ContextTypes.DEFAULT_TYPE) -> in
     await update.message.reply_text(f"✅ Price set to ₹{price}. Uploading to Dukaan...")
     
     details = context.user_data.get('draft_details', {})
-    processed_path = context.user_data.get('processed_path')
+    image_paths = context.user_data.get('image_paths')
     
     # Inject the manual price into the rich details payload
     details['base_price'] = price
     
     try:
-        process_and_list_product(processed_path, details)
+        process_and_list_product(image_paths, details)
         await update.message.reply_text("🎉 **Successfully listed on your Dukaan store!**", parse_mode='Markdown')
     except Exception as e:
         await update.message.reply_text(f"⚠️ Failed to list the product on Dukaan. Error: {e}")

@@ -33,9 +33,10 @@ def upload_to_imgbb(image_path: str) -> str:
     else:
         raise Exception(f"Failed to upload to ImgBB: {response.text}")
 
-def create_dukaan_product(details: dict, image_url: str) -> dict:
+def create_dukaan_product(details: dict, image_urls: list) -> dict:
     """
     Creates a product listing on the Dukaan store with rich fields using the v2 endpoint.
+    Expects a list of image URLs.
     """
     if not DUKAAN_API_TOKEN or not DUKAAN_STORE_UUID:
         raise ValueError("Dukaan credentials are not set.")
@@ -54,10 +55,12 @@ def create_dukaan_product(details: dict, image_url: str) -> dict:
     sku = details.get("sku", "")
     inv = details.get("stock_quantity", 10)
     
+    primary_url = image_urls[0] if image_urls else ""
+    
     # Exact payload structure expected by Dukaan API v2
     payload = {
         "name": title,
-        "all_images": [image_url],
+        "all_images": image_urls,
         "selling_price": price,
         "original_price": orig_price,
         "unit": "piece",
@@ -73,8 +76,8 @@ def create_dukaan_product(details: dict, image_url: str) -> dict:
                 "inventory": inv,
                 "selling_price": price,
                 "original_price": orig_price,
-                "primary_image": image_url,
-                "all_images": [image_url],
+                "primary_image": primary_url,
+                "all_images": image_urls,
                 "attributes": [],
                 "staffs": [],
                 "metafields": [],
@@ -92,7 +95,7 @@ def create_dukaan_product(details: dict, image_url: str) -> dict:
         "seo_data": {
             "title": title[:60],
             "description": desc[:160],
-            "image": image_url
+            "image": primary_url
         },
         "inventory_quantity": inv,
         "in_stock": True,
@@ -110,15 +113,18 @@ def create_dukaan_product(details: dict, image_url: str) -> dict:
     else:
         raise Exception(f"Failed to create product on Dukaan: {response.status_code} - {response.text}")
 
-def process_and_list_product(image_path: str, details: dict):
+def process_and_list_product(image_paths: list, details: dict):
     """
-    High-level function to upload image and list product with rich details.
+    High-level function to upload multiple images and list product with rich details.
     """
-    print("Uploading image to ImgBB...")
-    public_url = upload_to_imgbb(image_path)
-    print(f"Image uploaded successfully: {public_url}")
-    
+    print(f"Uploading {len(image_paths)} images to ImgBB...")
+    public_urls = []
+    for path in image_paths:
+        url = upload_to_imgbb(path)
+        public_urls.append(url)
+        print(f"Image uploaded successfully: {url}")
+        
     print("Creating product on Dukaan...")
-    result = create_dukaan_product(details, public_url)
+    result = create_dukaan_product(details, public_urls)
     print("Product created successfully!")
     return result

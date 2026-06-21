@@ -80,3 +80,48 @@ def generate_product_details(image_path: str, user_notes: str = None) -> dict:
         except:
             pass
         return {"title": "Generated Product", "description": "Please update the description manually. AI generation failed."}
+
+def generate_lifestyle_background(product_title: str) -> bytes:
+    """Uses Gemini Imagen 4.0 to generate a lifestyle background based on the product title."""
+    api_key = os.getenv("GEMINI_API_KEY")
+    
+    # 1. Ask Gemini Text to generate a great prompt
+    text_url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-flash-latest:generateContent?key={api_key}"
+    text_payload = {
+        "contents": [{
+            "parts": [{"text": f"Write a single sentence (max 20 words) describing a beautiful, modern, highly realistic lifestyle background scene that would fit a product called '{product_title}'. For example: 'A sleek modern wooden desk next to a bright window with a small coffee plant'. Do not mention the product itself, just the empty background scene."}]
+        }]
+    }
+    
+    prompt = "A beautiful modern wooden coffee table in a sunlit living room, depth of field, 4k"
+    try:
+        r = requests.post(text_url, json=text_payload, headers={'Content-Type': 'application/json'})
+        if r.status_code == 200:
+            prompt = r.json()['candidates'][0]['content']['parts'][0]['text'].strip()
+    except Exception as e:
+        print(f"Failed to generate dynamic prompt, falling back: {e}")
+        
+    print(f"Imagen Prompt: {prompt}")
+    
+    # 2. Call Imagen 4.0 API
+    imagen_url = f"https://generativelanguage.googleapis.com/v1beta/models/imagen-4.0-fast-generate-001:predict?key={api_key}"
+    imagen_payload = {
+        "instances": [{"prompt": prompt}],
+        "parameters": {"sampleCount": 1}
+    }
+    
+    try:
+        r = requests.post(imagen_url, json=imagen_payload, headers={'Content-Type': 'application/json'})
+        r.raise_for_status()
+        data = r.json()
+        
+        # The API returns predictions[0]['bytesBase64Encoded']
+        b64_image = data['predictions'][0]['bytesBase64Encoded']
+        return base64.b64decode(b64_image)
+    except Exception as e:
+        print(f"Error generating lifestyle background: {e}")
+        try:
+            print(r.text)
+        except:
+            pass
+        return None
